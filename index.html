@@ -42,14 +42,17 @@ document.querySelector('button[type="submit"]').addEventListener('click', async 
   // Clear previous results
   document.querySelectorAll('.bg-danger img').forEach(img => img.remove());
 
+  const MAX_PIXELS = 16777216;
+  const TARGET_WIDTH = 768;
+
   // Resize each image to 768px wide before stacking
   async function loadAndResize(file) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        const scale = 768 / img.width;
+        const scale = TARGET_WIDTH / img.width;
         const canvas = document.createElement('canvas');
-        canvas.width = 768;
+        canvas.width = TARGET_WIDTH;
         canvas.height = img.height * scale;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -62,10 +65,17 @@ document.querySelector('button[type="submit"]').addEventListener('click', async 
 
   const resizedCanvases = await Promise.all([...files].map(loadAndResize));
 
-  // Stack resized canvases
   const totalHeight = resizedCanvases.reduce((sum, c) => sum + c.height, 0);
+  const totalPixels = TARGET_WIDTH * totalHeight;
+
+  if (totalPixels > MAX_PIXELS) {
+    alert(`Too many images! Final canvas would be ${totalPixels.toLocaleString()} pixels, which exceeds the safe limit of 16,777,216.`);
+    return;
+  }
+
+  // Create final canvas
   const finalCanvas = document.createElement('canvas');
-  finalCanvas.width = 768;
+  finalCanvas.width = TARGET_WIDTH;
   finalCanvas.height = totalHeight;
   const ctx = finalCanvas.getContext('2d');
 
@@ -75,7 +85,7 @@ document.querySelector('button[type="submit"]').addEventListener('click', async 
     ctx.drawImage(c, 0, yOffset);
 
     if (i === 0) {
-      const fontSize = Math.floor(768 * 0.10);
+      const fontSize = Math.floor(TARGET_WIDTH * 0.10);
       ctx.font = `${fontSize}px sans-serif`;
       ctx.lineWidth = Math.max(2, fontSize * 0.05);
       const textX = 10;
