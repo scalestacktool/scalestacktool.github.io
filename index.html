@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <title>Scale Stack</title>
+  </head>
+  <body class="bg-dark">
+    <div class="container-fluid">
+      <div class="bg-danger bg-gradient text-white p-4 mx-auto mt-4 rounded-2 shadow-lg" style="max-width: 100%; width: 100%; max-width: 600px;">
+        <h1>Scale Stack</h1>
+        <div class="row">
+          <div class="col-12 col-md-6">
+            <label for="serial">Serial</label>
+            <input type="text" class="form-control" id="serial" placeholder="Enter scale serial">
+          </div>
+          <div class="col-12 col-md-6 mt-3 mt-md-0">
+            <form>
+              <div class="mb-3">
+                <label for="exampleFormControlFile1">Select stacked images</label>
+                <input type="file" class="form-control" id="exampleFormControlFile1" multiple>
+              </div>
+            </form>
+            <button type="submit" class="btn btn-light w-100">Stack</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.querySelector('button[type="submit"]').addEventListener('click', async function (e) {
+        e.preventDefault();
+
+        const serial = document.getElementById('serial').value.trim();
+        const files = document.getElementById('exampleFormControlFile1').files;
+
+        if (!serial || files.length === 0) {
+          alert('Please enter a serial and select at least one image.');
+          return;
+        }
+
+        // Load all images
+        const images = await Promise.all([...files].map(file => {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = URL.createObjectURL(file);
+          });
+        }));
+
+        // Use width of first image, sum heights
+        const canvasWidth = images[0].width;
+        const canvasHeight = images.reduce((sum, img) => sum + img.height, 0);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const ctx = canvas.getContext('2d');
+
+        // Stack images vertically
+        let yOffset = 0;
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          ctx.drawImage(img, 0, yOffset);
+
+          // After drawing first image, overlay serial
+          if (i === 0) {
+            const textX = 10;
+            const textY = yOffset + 240;
+
+            ctx.font = '160px sans-serif';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'black';
+            ctx.strokeText(serial, textX, textY); // dark outline
+            ctx.fillStyle = 'white';
+            ctx.fillText(serial, textX, textY);   // light fill
+          }
+
+          yOffset += img.height;
+        }
+
+        // Display result
+        const resultImg = document.createElement('img');
+        resultImg.src = canvas.toDataURL();
+        resultImg.className = 'mt-4 img-fluid rounded shadow';
+        document.querySelector('.bg-danger').appendChild(resultImg);
+      });
+    </script>
+  </body>
+</html>
