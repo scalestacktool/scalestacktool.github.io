@@ -49,56 +49,62 @@ document.querySelector('button[type="submit"]').addEventListener('click', async 
     });
   }));
 
-  // Resize all images to a fixed width (e.g. 600px) to reduce memory usage
-  const targetWidth = 600;
-  async function resizeImage(img, width) {
-    const scale = width / img.width;
+  // Resize all images to match the width of the first image
+  const baseWidth = images[0].width;
+  const resizedImages = images.map(img => {
+    const scale = baseWidth / img.width;
     const canvas = document.createElement('canvas');
-    canvas.width = width;
+    canvas.width = baseWidth;
     canvas.height = img.height * scale;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return new Promise(resolve => {
-      const resized = new Image();
-      resized.onload = () => resolve(resized);
-      resized.src = canvas.toDataURL();
-    });
-  }
+    const resized = new Image();
+    resized.src = canvas.toDataURL();
+    return resized;
+  });
 
-  const resizedImages = await Promise.all(images.map(img => resizeImage(img, targetWidth)));
+  // Wait for all resized images to load
+  await Promise.all(resizedImages.map(img => new Promise(resolve => img.onload = resolve)));
 
-  // Create final canvas
-  const canvasHeight = resizedImages.reduce((sum, img) => sum + img.height, 0);
-  const canvas = document.createElement('canvas');
-  canvas.width = targetWidth;
-  canvas.height = canvasHeight;
-  const ctx = canvas.getContext('2d');
+  // Stack images on a base canvas
+  const stackedHeight = resizedImages.reduce((sum, img) => sum + img.height, 0);
+  const stackedCanvas = document.createElement('canvas');
+  stackedCanvas.width = baseWidth;
+  stackedCanvas.height = stackedHeight;
+  const stackedCtx = stackedCanvas.getContext('2d');
 
-  // Font size = 10% of canvas width
-  const fontSize = Math.floor(canvas.width * 0.10);
-  ctx.font = `${fontSize}px sans-serif`;
-  ctx.lineWidth = Math.max(2, fontSize * 0.05);
+  // Font size = 10% of final width
+  const fontSize = Math.floor(768 * 0.10);
+  stackedCtx.font = `${fontSize}px sans-serif`;
+  stackedCtx.lineWidth = Math.max(2, fontSize * 0.05);
 
   // Stack images and overlay serial
   let yOffset = 0;
   for (let i = 0; i < resizedImages.length; i++) {
     const img = resizedImages[i];
-    ctx.drawImage(img, 0, yOffset);
+    stackedCtx.drawImage(img, 0, yOffset);
 
     if (i === 0) {
       const textX = 10;
       const textY = yOffset + fontSize + 10;
-      ctx.strokeStyle = 'black';
-      ctx.strokeText(serial, textX, textY);
-      ctx.fillStyle = 'white';
-      ctx.fillText(serial, textX, textY);
+      stackedCtx.strokeStyle = 'black';
+      stackedCtx.strokeText(serial, textX, textY);
+      stackedCtx.fillStyle = 'white';
+      stackedCtx.fillText(serial, textX, textY);
     }
 
     yOffset += img.height;
   }
 
-  // Use toBlob for better mobile compatibility
-  canvas.toBlob(blob => {
+  // Resize final canvas to 768px wide
+  const finalCanvas = document.createElement('canvas');
+  finalCanvas.width = 768;
+  finalCanvas.height = Math.floor((768 / baseWidth) * stackedCanvas.height);
+  const finalCtx = finalCanvas.getContext('2d');
+  finalCtx.drawImage(stackedCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
+
+  // Use toBlob for mobile-safe rendering
+  finalCanvas.toBlob(blob => {
     const url = URL.createObjectURL(blob);
     const resultImg = document.createElement('img');
     resultImg.src = url;
