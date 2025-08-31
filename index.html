@@ -27,65 +27,85 @@
         </div>
       </div>
     </div>
-    <script>
-      document.querySelector('button[type="submit"]').addEventListener('click', async function (e) {
-        e.preventDefault();
+<script>
+document.querySelector('button[type="submit"]').addEventListener('click', async function (e) {
+  e.preventDefault();
 
-        const serial = document.getElementById('serial').value.trim();
-        const files = document.getElementById('exampleFormControlFile1').files;
+  const serial = document.getElementById('serial').value.trim();
+  const files = document.getElementById('exampleFormControlFile1').files;
 
-        if (!serial || files.length === 0) {
-          alert('Please enter a serial and select at least one image.');
-          return;
-        }
+  if (!serial || files.length === 0) {
+    alert('Please enter a serial and select at least one image.');
+    return;
+  }
 
-        // Load all images
-        const images = await Promise.all([...files].map(file => {
-          return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = URL.createObjectURL(file);
-          });
-        }));
+  // Load all images
+  const images = await Promise.all([...files].map(file => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }));
 
-        // Use width of first image, sum heights
-        const canvasWidth = images[0].width;
-        const canvasHeight = images.reduce((sum, img) => sum + img.height, 0);
+  // Resize all images to a fixed width (e.g. 600px) to reduce memory usage
+  const targetWidth = 600;
+  async function resizeImage(img, width) {
+    const scale = width / img.width;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = img.height * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return new Promise(resolve => {
+      const resized = new Image();
+      resized.onload = () => resolve(resized);
+      resized.src = canvas.toDataURL();
+    });
+  }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = canvasWidth;
-        canvas.height = canvasHeight;
-        const ctx = canvas.getContext('2d');
+  const resizedImages = await Promise.all(images.map(img => resizeImage(img, targetWidth)));
 
-        // Stack images vertically
-        let yOffset = 0;
-        for (let i = 0; i < images.length; i++) {
-          const img = images[i];
-          ctx.drawImage(img, 0, yOffset);
+  // Create final canvas
+  const canvasHeight = resizedImages.reduce((sum, img) => sum + img.height, 0);
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext('2d');
 
-          // After drawing first image, overlay serial
-          if (i === 0) {
-            const textX = 10;
-            const textY = yOffset + 240;
+  // Font size = 10% of canvas width
+  const fontSize = Math.floor(canvas.width * 0.10);
+  ctx.font = `${fontSize}px sans-serif`;
+  ctx.lineWidth = Math.max(2, fontSize * 0.05);
 
-            ctx.font = '160px sans-serif';
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = 'black';
-            ctx.strokeText(serial, textX, textY); // dark outline
-            ctx.fillStyle = 'white';
-            ctx.fillText(serial, textX, textY);   // light fill
-          }
+  // Stack images and overlay serial
+  let yOffset = 0;
+  for (let i = 0; i < resizedImages.length; i++) {
+    const img = resizedImages[i];
+    ctx.drawImage(img, 0, yOffset);
 
-          yOffset += img.height;
-        }
+    if (i === 0) {
+      const textX = 10;
+      const textY = yOffset + fontSize + 10;
+      ctx.strokeStyle = 'black';
+      ctx.strokeText(serial, textX, textY);
+      ctx.fillStyle = 'white';
+      ctx.fillText(serial, textX, textY);
+    }
 
-        // Display result
-        const resultImg = document.createElement('img');
-        resultImg.src = canvas.toDataURL();
-        resultImg.className = 'mt-4 img-fluid rounded shadow';
-        document.querySelector('.bg-danger').appendChild(resultImg);
-      });
-    </script>
+    yOffset += img.height;
+  }
+
+  // Use toBlob for better mobile compatibility
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const resultImg = document.createElement('img');
+    resultImg.src = url;
+    resultImg.className = 'mt-4 img-fluid rounded shadow';
+    document.querySelector('.bg-danger').appendChild(resultImg);
+  });
+});
+</script>
   </body>
 </html>
