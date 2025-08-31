@@ -52,43 +52,72 @@ document.querySelector('button[type="submit"]').addEventListener('click', async 
     });
   }));
 
-  // Stack images at native size
-  const canvasWidth = images[0].width;
-  const canvasHeight = images.reduce((sum, img) => sum + img.height, 0);
-  const stackedCanvas = document.createElement('canvas');
-  stackedCanvas.width = canvasWidth;
-  stackedCanvas.height = canvasHeight;
-  const ctx = stackedCanvas.getContext('2d');
+  // Batch size (safe for iOS)
+  const BATCH_SIZE = 3;
 
-  let yOffset = 0;
-  for (let i = 0; i < images.length; i++) {
-    const img = images[i];
-    ctx.drawImage(img, 0, yOffset);
+  // Helper: stack a batch of images into one canvas
+  function stackBatch(batch, overlaySerial = false) {
+    const width = batch[0].width;
+    const height = batch.reduce((sum, img) => sum + img.height, 0);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
 
-    if (i === 0) {
-      const fontSize = Math.floor(768 * 0.10);
-      ctx.font = `${fontSize}px sans-serif`;
-      ctx.lineWidth = Math.max(2, fontSize * 0.05);
-      const textX = 10;
-      const textY = yOffset + fontSize + 10;
-      ctx.strokeStyle = 'black';
-      ctx.strokeText(serial, textX, textY);
-      ctx.fillStyle = 'white';
-      ctx.fillText(serial, textX, textY);
+    let yOffset = 0;
+    for (let i = 0; i < batch.length; i++) {
+      const img = batch[i];
+      ctx.drawImage(img, 0, yOffset);
+
+      if (overlaySerial && i === 0) {
+        const fontSize = Math.floor(768 * 0.10);
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.lineWidth = Math.max(2, fontSize * 0.05);
+        const textX = 10;
+        const textY = yOffset + fontSize + 10;
+        ctx.strokeStyle = 'black';
+        ctx.strokeText(serial, textX, textY);
+        ctx.fillStyle = 'white';
+        ctx.fillText(serial, textX, textY);
+      }
+
+      yOffset += img.height;
     }
 
-    yOffset += img.height;
+    return canvas;
   }
 
-  // Resize final canvas to 768px wide
-  const finalCanvas = document.createElement('canvas');
-  finalCanvas.width = 768;
-  finalCanvas.height = Math.floor((768 / canvasWidth) * canvasHeight);
-  const finalCtx = finalCanvas.getContext('2d');
-  finalCtx.drawImage(stackedCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
+  // Stack all batches
+  const batchCanvases = [];
+  for (let i = 0; i < images.length; i += BATCH_SIZE) {
+    const batch = images.slice(i, i + BATCH_SIZE);
+    const isFirstBatch = i === 0;
+    batchCanvases.push(stackBatch(batch, isFirstBatch));
+  }
 
-  // Render result using toBlob
-  finalCanvas.toBlob(blob => {
+  // Merge all batch canvases into one
+  const finalWidth = batchCanvases[0].width;
+  const finalHeight = batchCanvases.reduce((sum, c) => sum + c.height, 0);
+  const mergedCanvas = document.createElement('canvas');
+  mergedCanvas.width = finalWidth;
+  mergedCanvas.height = finalHeight;
+  const mergedCtx = mergedCanvas.getContext('2d');
+
+  let yOffset = 0;
+  for (const batchCanvas of batchCanvases) {
+    mergedCtx.drawImage(batchCanvas, 0, yOffset);
+    yOffset += batchCanvas.height;
+  }
+
+  // Resize to 768px wide
+  const scaledCanvas = document.createElement('canvas');
+  scaledCanvas.width = 768;
+  scaledCanvas.height = Math.floor((768 / finalWidth) * finalHeight);
+  const scaledCtx = scaledCanvas.getContext('2d');
+  scaledCtx.drawImage(mergedCanvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+
+  // Render result
+  scaledCanvas.toBlob(blob => {
     const url = URL.createObjectURL(blob);
     const resultImg = document.createElement('img');
     resultImg.src = url;
