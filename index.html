@@ -42,25 +42,28 @@ document.querySelector('button[type="submit"]').addEventListener('click', async 
   // Clear previous results
   document.querySelectorAll('.bg-danger img').forEach(img => img.remove());
 
-  // Decode images using createImageBitmap (faster than <img>)
-  const bitmaps = await Promise.all([...files].map(file =>
-    createImageBitmap(file)
-  ));
+  // Load images using <img> for iOS compatibility
+  const images = await Promise.all([...files].map(file => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }));
 
-  // Use width of first image, sum heights
-  const baseWidth = bitmaps[0].width;
-  const stackedHeight = bitmaps.reduce((sum, bmp) => sum + bmp.height, 0);
-
-  // Stack images on canvas
+  // Stack images at native size
+  const canvasWidth = images[0].width;
+  const canvasHeight = images.reduce((sum, img) => sum + img.height, 0);
   const stackedCanvas = document.createElement('canvas');
-  stackedCanvas.width = baseWidth;
-  stackedCanvas.height = stackedHeight;
+  stackedCanvas.width = canvasWidth;
+  stackedCanvas.height = canvasHeight;
   const ctx = stackedCanvas.getContext('2d');
 
   let yOffset = 0;
-  for (let i = 0; i < bitmaps.length; i++) {
-    const bmp = bitmaps[i];
-    ctx.drawImage(bmp, 0, yOffset);
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    ctx.drawImage(img, 0, yOffset);
 
     if (i === 0) {
       const fontSize = Math.floor(768 * 0.10);
@@ -74,13 +77,13 @@ document.querySelector('button[type="submit"]').addEventListener('click', async 
       ctx.fillText(serial, textX, textY);
     }
 
-    yOffset += bmp.height;
+    yOffset += img.height;
   }
 
   // Resize final canvas to 768px wide
   const finalCanvas = document.createElement('canvas');
   finalCanvas.width = 768;
-  finalCanvas.height = Math.floor((768 / baseWidth) * stackedCanvas.height);
+  finalCanvas.height = Math.floor((768 / canvasWidth) * canvasHeight);
   const finalCtx = finalCanvas.getContext('2d');
   finalCtx.drawImage(stackedCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
 
