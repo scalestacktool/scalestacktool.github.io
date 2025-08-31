@@ -39,8 +39,6 @@
             return;
         }
 
-        document.querySelectorAll('.bg-danger img').forEach(img => img.remove());
-
         // Load all images
         const images = await Promise.all([...files].map(file => {
             return new Promise((resolve, reject) => {
