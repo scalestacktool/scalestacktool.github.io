@@ -60,7 +60,7 @@
                 resolve(canvas);
               };
               img.onerror = reject;
-              img.src = reader.result; // base64 data URL
+              img.src = reader.result;
             };
             reader.onerror = reject;
             reader.readAsDataURL(file);
