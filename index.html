@@ -99,7 +99,11 @@
           yOffset += c.height;
         }
 
-        finalCanvas.toBlob(blob => { const url = URL.createObjectURL(blob); const resultImg = document.createElement('img'); resultImg.src = url; resultImg.className = 'mt-4 img-fluid rounded shadow'; document.querySelector('.bg-danger').appendChild(resultImg); }, 'image/jpeg', 0.92); // MIME type and quality (0.0–1.0)      });
+        const jpegDataUrl = finalCanvas.toDataURL('image/jpeg', 0.92);
+        const resultImg = document.createElement('img');
+        resultImg.src = jpegDataUrl;
+        resultImg.className = 'mt-4 img-fluid rounded shadow';
+        document.querySelector('.bg-danger').appendChild(resultImg);
     </script>
   </body>
 </html>
